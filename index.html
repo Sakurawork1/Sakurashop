@@ -743,6 +743,15 @@
     .filtermenu-apply{flex:2;padding:13px;background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;border-radius:12px;color:#fee2e2;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
     .filtermenu-apply:hover{opacity:.88}
 
+
+    /* ── PAYMENT POLLING ── */
+    .pay-check-btn{width:100%;margin-top:12px;padding:13px;background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.3);border-radius:12px;color:#6ee7b7;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+    .pay-check-btn:hover{background:rgba(110,231,183,0.2)}
+    .pay-check-btn.checking{animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .pay-success{margin-top:12px;padding:14px;background:rgba(110,231,183,0.08);border:1px solid rgba(110,231,183,0.3);border-radius:12px;font-size:13px;color:#6ee7b7;text-align:center;line-height:1.6}
+    .pay-status{font-size:11px;color:rgba(252,165,165,0.4);text-align:center;margin-top:6px}
+
   </style>
 </head>
 <body>
@@ -850,8 +859,15 @@
       <div class="addr-label">Send exact amount to:</div>
       <div class="addr-box-inner" id="addr-value" onclick="copyAddress()"></div>
       <div class="addr-copy-hint">Tap address to copy</div>
-      <div class="addr-note">
-        ⚠️ Send the <b>exact</b> amount shown. After payment DM on Discord with your transaction ID.
+      <div class="addr-note" id="addr-note">
+        ⚠️ Send the <b>exact</b> amount shown. After payment confirmation we will deliver your item.
+      </div>
+      <div class="pay-status" id="pay-status" style="display:none"></div>
+      <button class="pay-check-btn" id="pay-check-btn" onclick="startPolling()" style="display:none">
+        <span class="pay-check-spinner" id="pay-spinner">⏳</span> Checking payment...
+      </button>
+      <div class="pay-success" id="pay-success" style="display:none">
+        ✅ Payment detected! <a href="https://discord.gg/PG7q7tXbak" target="_blank" style="color:#6ee7b7">DM on Discord</a> with your order!
       </div>
     </div>
   </div>
@@ -1094,7 +1110,7 @@
       </div>
       <div class="card-body">
         <div class="card-name">Gargantuan Gingerbread Angelus</div>
-        <div class="card-price">💰 40$</div>
+        <div class="card-price" id="price-angelus">💰 40$</div>
         <div class="stock-wrap">
           <span class="stock-label">Stock:</span>
           <span class="stock-val" data-stock="1"></span>
@@ -1116,7 +1132,7 @@
       </div>
       <div class="card-body">
         <div class="card-name">1B Gems</div>
-        <div class="card-price">💰 0.90$</div>
+        <div class="card-price" id="price-gems">💰 0.90$</div>
         <div class="stock-wrap">
           <span class="stock-label">Stock:</span>
           <span class="stock-val" data-stock="5"></span>
@@ -1524,6 +1540,9 @@
         }
       }
     }
+    function closeFeatures() {
+      document.getElementById('features-overlay').classList.remove('open');
+    }
 
     /* ── PETALS ── */
     var petalsCanvas = document.getElementById('petals');
@@ -1609,6 +1628,170 @@
       });
       updateFilterMenu();
     }
+
+
+    // ── BLOCKCYPHER PAYMENT POLLING ──────────────────────────────
+    var BC_TOKEN = '36cb43297b0a461997eae64d5e9b031f';
+    var pollInterval = null;
+    var pollCount = 0;
+    var currentPayAddr = '';
+    var currentPayCrypto = '';
+    var currentPayAmount = 0;
+
+    // Override showAddress to start polling after display
+    var _origShowAddress = showAddress;
+    showAddress = async function(crypto) {
+      await _origShowAddress(crypto);
+      currentPayCrypto = crypto;
+      currentPayAddr = document.getElementById('addr-value').textContent.trim();
+      var amtText = document.getElementById('addr-crypto').textContent;
+      var m = amtText.match(/[0-9]+[.]?[0-9]*/);
+      currentPayAmount = m ? parseFloat(m[0]) : 0;
+      // Show the check button
+      document.getElementById('pay-check-btn').style.display = 'block';
+      document.getElementById('pay-success').style.display = 'none';
+      document.getElementById('pay-status').style.display = 'none';
+      stopPolling();
+    };
+
+    function startPolling() {
+      var btn = document.getElementById('pay-check-btn');
+      btn.classList.add('checking');
+      btn.textContent = '⏳ Checking payment...';
+      pollCount = 0;
+      stopPolling();
+      checkPayment();
+      pollInterval = setInterval(checkPayment, 20000);
+    }
+
+    function stopPolling() {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    }
+
+    async function checkPayment() {
+      if (!currentPayAddr) return;
+      pollCount++;
+      var statusEl = document.getElementById('pay-status');
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Checking... (attempt ' + pollCount + ')';
+
+      try {
+        var coin = currentPayCrypto === 'BTC' ? 'btc' : 'ltc';
+        var url = 'https://api.blockcypher.com/v1/' + coin + '/main/addrs/' + currentPayAddr + '/full?limit=5&token=' + BC_TOKEN;
+        var resp = await fetch(url);
+        var data = await resp.json();
+
+        if (data.txs && data.txs.length > 0) {
+          var latestTx = data.txs[0];
+          // Check if any output goes to our address
+          var received = false;
+          if (latestTx.outputs) {
+            latestTx.outputs.forEach(function(out) {
+              if (out.addresses && out.addresses.indexOf(currentPayAddr) !== -1) {
+                received = true;
+              }
+            });
+          }
+          if (received) {
+            stopPolling();
+            document.getElementById('pay-check-btn').style.display = 'none';
+            document.getElementById('pay-success').style.display = 'block';
+            statusEl.style.display = 'none';
+            // Save to analytics
+            var orders = JSON.parse(localStorage.getItem('sa_orders') || '[]');
+            orders.push({
+              time: new Date().toISOString(),
+              crypto: currentPayCrypto,
+              amount: currentPayAmount,
+              addr: currentPayAddr,
+              txid: latestTx.hash || 'unknown'
+            });
+            localStorage.setItem('sa_orders', JSON.stringify(orders));
+            return;
+          }
+        }
+        statusEl.textContent = 'No payment found yet. Retrying in 20s... (attempt ' + pollCount + ')';
+      } catch(e) {
+        statusEl.textContent = 'Connection error. Retrying...';
+      }
+
+      if (pollCount >= 30) {
+        stopPolling();
+        statusEl.textContent = 'Timed out after 10 minutes. If you paid, DM on Discord.';
+        document.getElementById('pay-check-btn').classList.remove('checking');
+      }
+    }
+
+    // Stop polling when modal closes
+    var _origCloseAddr = closeAddr;
+    closeAddr = function() {
+      stopPolling();
+      _origCloseAddr();
+    };
+
+    // ── ANALYTICS & ADMIN ──────────────────────────────────────────
+    var pv = parseInt(localStorage.getItem('sa_pageviews') || '0') + 1;
+    localStorage.setItem('sa_pageviews', pv);
+    if (!sessionStorage.getItem('sa_sess')) {
+      sessionStorage.setItem('sa_sess', '1');
+      localStorage.setItem('sa_sessions', parseInt(localStorage.getItem('sa_sessions') || '0') + 1);
+    }
+
+    function loadAdminOverrides() {
+      var prOvr = JSON.parse(localStorage.getItem('sa_prices') || '{}');
+      var stOvr = JSON.parse(localStorage.getItem('sa_stocks') || '{}');
+      Object.keys(prOvr).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && prOvr[id] !== '') el.textContent = '$' + prOvr[id];
+      });
+      Object.keys(stOvr).forEach(function(i) {
+        var cards = document.querySelectorAll('#items-grid .card');
+        var card = cards[parseInt(i)];
+        if (!card) return;
+        var se = card.querySelector('.stock-val');
+        if (!se) return;
+        var n = parseInt(stOvr[i]);
+        se.setAttribute('data-stock', n);
+        se.textContent = n <= 0 ? 'Out of Stock' : n + ' left';
+        se.classList.toggle('out', n <= 0);
+      });
+    }
+    loadAdminOverrides();
+
+    var _origOpen = openItemModal;
+    openItemModal = function(w) {
+      var c = w.closest('.card');
+      if (c) {
+        var nm = c.querySelector('.card-name').textContent.trim();
+        var vws = JSON.parse(localStorage.getItem('sa_views') || '{}');
+        vws[nm] = (vws[nm] || 0) + 1;
+        localStorage.setItem('sa_views', JSON.stringify(vws));
+      }
+      _origOpen(w);
+    };
+
+    var _origATC = addToCart;
+    addToCart = function(btn) {
+      var c = btn.closest('.card');
+      if (c) {
+        var nm = c.querySelector('.card-name').textContent.trim();
+        var atcs = JSON.parse(localStorage.getItem('sa_atc') || '{}');
+        atcs[nm] = (atcs[nm] || 0) + 1;
+        localStorage.setItem('sa_atc', JSON.stringify(atcs));
+      }
+      _origATC(btn);
+    };
+
+    var _tapN = 0, _tapT = null;
+    document.addEventListener('DOMContentLoaded', function() {
+      var t = document.querySelector('.header-title');
+      if (t) t.addEventListener('click', function() {
+        _tapN++;
+        clearTimeout(_tapT);
+        _tapT = setTimeout(function() { _tapN = 0; }, 2000);
+        if (_tapN >= 7) { _tapN = 0; window.location.href = 'admin.html'; }
+      });
+    });
 
   </script>
 
