@@ -1850,12 +1850,12 @@
       showTyping();
 
       try {
-        var response = await fetch('https://api.anthropic.com/v1/messages', {
+        var response = await fetch('https://dry-base-1b95.31frischest-gemunkelt.workers.dev/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1000,
+            model: 'llama3-8b-8192',
+            max_tokens: 500,
             system: buildSystemPrompt(),
             messages: aiHistory
           })
