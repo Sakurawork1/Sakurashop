@@ -1891,7 +1891,7 @@
       statusEl.textContent = 'Checking... (attempt ' + pollCount + ')';
       try {
         var coin = currentPayCrypto === 'BTC' ? 'btc' : 'ltc';
-        var resp = await fetch('https://api.blockcypher.com/v1/' + coin + '/main/addrs/' + currentPayAddr + '/full?limit=5&token=36cb43297b0a461997eae64d5e9b031f');
+        var resp = await fetch('https://dry-base-1b95.31frischest-gemunkelt.workers.dev/check-payment?coin=' + coin + '&addr=' + currentPayAddr);
         var data = await resp.json();
         if (data.txs && data.txs.length > 0) {
           var received = false, matchedTx = null;
