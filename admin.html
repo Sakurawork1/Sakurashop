@@ -80,7 +80,31 @@
 
   .section-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
   .empty-state { text-align: center; color: var(--sub); font-size: 13px; padding: 20px 0; }
+
+    .gc-form{display:flex;flex-direction:column;gap:10px}
+    .gc-row{display:flex;gap:8px}
+    .gc-input{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(196,28,28,0.2);border-radius:10px;padding:10px 12px;font-size:13px;color:#fee2e2;font-family:'DM Sans',sans-serif;outline:none;-moz-appearance:textfield}
+    .gc-input::-webkit-outer-spin-button,.gc-input::-webkit-inner-spin-button{-webkit-appearance:none}
+    .gc-input:focus{border-color:rgba(196,28,28,0.5)}
+    .gc-input::placeholder{color:rgba(252,165,165,0.3)}
+    .gc-create-btn{padding:10px 16px;background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;border-radius:10px;color:#fee2e2;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .gc-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;max-height:300px;overflow-y:auto}
+    .gc-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(196,28,28,0.12);border-radius:10px;padding:10px 12px}
+    .gc-code{font-family:monospace;font-size:13px;color:#fee2e2;flex:1;letter-spacing:1px}
+    .gc-value{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fbbf24;white-space:nowrap}
+    .gc-status-used{font-size:10px;color:#f87171;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);border-radius:999px;padding:2px 8px}
+    .gc-status-avail{font-size:10px;color:#6ee7b7;background:rgba(110,231,183,0.1);border:1px solid rgba(110,231,183,0.2);border-radius:999px;padding:2px 8px}
+    .gc-delete{background:none;border:none;color:rgba(248,113,113,0.4);cursor:pointer;font-size:16px}
+    .gc-delete:hover{color:#f87171}
+    .gc-msg{font-size:12px;min-height:16px;text-align:center}
+    .gc-msg.ok{color:#6ee7b7}
+    .gc-msg.err{color:#f87171}
+    .gc-empty{text-align:center;color:rgba(252,165,165,0.25);font-size:13px;padding:16px 0}
+
 </style>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -152,6 +176,25 @@
       <div class="editor-grid" id="editor-grid"></div>
       <button class="save-btn" onclick="saveOverrides()">💾 Save Changes to Shop</button>
       <div class="save-confirm" id="save-confirm"></div>
+    </div>
+
+
+    <!-- GIFT CARDS -->
+    <div>
+      <div class="section-title"><i class="ti ti-gift"></i> Gift Cards</div>
+      <div class="section-card">
+        <div class="gc-form">
+          <div class="gc-row">
+            <input class="gc-input" id="gc-code-input" type="text" placeholder="Code (e.g. GIFT-ABC)" style="text-transform:uppercase"/>
+            <input class="gc-input" id="gc-value-input" type="number" placeholder="$" min="0.01" step="0.01" style="max-width:80px"/>
+            <button class="gc-create-btn" onclick="createGiftCard()">+ Create</button>
+          </div>
+          <div class="gc-msg" id="gc-msg"></div>
+        </div>
+        <div class="gc-list" id="gc-list">
+          <div class="gc-empty">No gift cards yet.</div>
+        </div>
+      </div>
     </div>
 
     <!-- DANGER ZONE -->
@@ -313,5 +356,95 @@
     setTimeout(function() { conf.textContent = ''; }, 3000);
   }
 </script>
+
+  <script>
+    // Firebase init
+    var fbDB = null;
+    window.addEventListener('load', function() {
+      if (typeof firebase === 'undefined') return;
+      if (!firebase.apps.length) {
+        firebase.initializeApp({
+          apiKey: "AIzaSyAUnIoaz2vyyXLMjpr1gsEkbXpkWkZ0qM4",
+          authDomain: "maxi-shop-4f4af.firebaseapp.com",
+          projectId: "maxi-shop-4f4af",
+          storageBucket: "maxi-shop-4f4af.firebasestorage.app",
+          messagingSenderId: "831333726687",
+          appId: "1:831333726687:web:7cbb5af74c0e1cc6452c6a"
+        });
+      }
+      fbDB = firebase.firestore();
+      // Load gift cards when dashboard opens
+      var origLoad = loadDashboard;
+      loadDashboard = function() {
+        origLoad();
+        loadGiftCards();
+      };
+      if (sessionStorage.getItem('admin_auth') === '1') loadGiftCards();
+    });
+
+    function generateCode() {
+      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      var code = 'GIFT-';
+      for (var i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    async function createGiftCard() {
+      if (!fbDB) { alert('Firebase not ready'); return; }
+      var codeInput = document.getElementById('gc-code-input');
+      var valueInput = document.getElementById('gc-value-input');
+      var msg = document.getElementById('gc-msg');
+      var code = codeInput.value.trim().toUpperCase() || generateCode();
+      var value = parseFloat(valueInput.value);
+      if (!value || value <= 0) { msg.textContent = 'Please enter a valid amount.'; msg.className = 'gc-msg err'; return; }
+      try {
+        var existing = await fbDB.collection('giftcards').doc(code).get();
+        if (existing.exists) { msg.textContent = 'Code already exists!'; msg.className = 'gc-msg err'; return; }
+        await fbDB.collection('giftcards').doc(code).set({
+          code: code, value: value, used: false, usedBy: null, createdAt: new Date().toISOString()
+        });
+        msg.textContent = '✓ Gift card created: ' + code + ' ($' + value.toFixed(2) + ')';
+        msg.className = 'gc-msg ok';
+        codeInput.value = ''; valueInput.value = '';
+        loadGiftCards();
+        setTimeout(function() { msg.textContent = ''; }, 3000);
+      } catch(e) {
+        msg.textContent = 'Error: ' + e.message;
+        msg.className = 'gc-msg err';
+      }
+    }
+
+    async function loadGiftCards() {
+      if (!fbDB) return;
+      var list = document.getElementById('gc-list');
+      if (!list) return;
+      try {
+        var snap = await fbDB.collection('giftcards').orderBy('createdAt', 'desc').get();
+        if (snap.empty) { list.innerHTML = '<div class="gc-empty">No gift cards yet.</div>'; return; }
+        list.innerHTML = snap.docs.map(function(doc) {
+          var d = doc.data();
+          var statusHtml = d.used
+            ? '<span class="gc-status-used">Used</span>'
+            : '<span class="gc-status-avail">Available</span>';
+          return '<div class="gc-item">' +
+            '<span class="gc-code">' + d.code + '</span>' +
+            '<span class="gc-value">$' + parseFloat(d.value).toFixed(2) + '</span>' +
+            statusHtml +
+            (!d.used ? '<button class="gc-delete" onclick="deleteGiftCard(\'' + d.code + '\')">✕</button>' : '') +
+          '</div>';
+        }).join('');
+      } catch(e) {
+        list.innerHTML = '<div class="gc-empty">Error loading gift cards.</div>';
+      }
+    }
+
+    async function deleteGiftCard(code) {
+      if (!fbDB) return;
+      if (!confirm('Delete gift card ' + code + '?')) return;
+      await fbDB.collection('giftcards').doc(code).delete();
+      loadGiftCards();
+    }
+  </script>
+
 </body>
 </html>
