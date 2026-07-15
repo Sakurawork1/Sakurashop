@@ -821,6 +821,23 @@
     .drawer-user-email{font-size:11px;color:rgba(252,165,165,0.35);margin-bottom:6px;word-break:break-all}
     .drawer-user-btn{width:100%;padding:9px;background:rgba(196,28,28,0.1);border:1px solid rgba(196,28,28,0.2);border-radius:10px;color:rgba(252,165,165,0.7);font-size:12px;font-weight:600;cursor:pointer}
 
+
+    /* ── BALANCE / GIFT CARD ── */
+    .balance-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:12px}
+    .gc-redeem-wrap{display:flex;gap:8px}
+    .gc-redeem-input{flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(196,28,28,0.2);border-radius:10px;padding:10px 12px;font-size:13px;color:#fee2e2;font-family:'DM Sans',sans-serif;outline:none;text-transform:uppercase}
+    .gc-redeem-input::placeholder{color:rgba(252,165,165,0.3);text-transform:none}
+    .gc-redeem-input:focus{border-color:rgba(196,28,28,0.5)}
+    .gc-redeem-btn{padding:10px 14px;background:linear-gradient(135deg,#dc2626,#7f1d1d);border:none;border-radius:10px;color:#fee2e2;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .gc-redeem-msg{font-size:11px;min-height:14px;margin-top:4px}
+    .gc-redeem-msg.ok{color:#6ee7b7}
+    .gc-redeem-msg.err{color:#f87171}
+    /* balance checkout btn */
+    .balance-pay-btn{width:100%;padding:14px;background:linear-gradient(135deg,#d97706,#92400e);border:none;border-radius:12px;color:#fee2e2;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .2s;margin-top:10px}
+    .balance-pay-btn:hover{opacity:.88}
+    .balance-pay-btn:disabled{opacity:.35;cursor:not-allowed}
+    .balance-info{font-size:12px;color:rgba(252,165,165,0.4);text-align:center;margin-top:8px}
+
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -910,6 +927,11 @@
         <button class="modal-close" onclick="closeCheckout()">✕</button>
       </div>
       <p class="checkout-sub">Choose your payment method</p>
+      <div class="balance-info" id="checkout-balance-info"></div>
+      <button class="balance-pay-btn" id="balance-pay-btn" onclick="payWithBalance()" style="display:none">
+        💰 Pay with Balance
+      </button>
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0"><div style="flex:1;height:1px;background:rgba(196,28,28,0.15)"></div><span style="font-size:11px;color:rgba(252,165,165,0.3)">or pay with crypto</span><div style="flex:1;height:1px;background:rgba(196,28,28,0.15)"></div></div>
       <div class="crypto-pick">
         <button class="crypto-pick-btn" onclick="showAddress('BTC')">
           <span class="crypto-icon">₿</span>
@@ -1750,6 +1772,7 @@
           if (du) du.style.display = 'block';
           if (de) de.textContent = user.email;
           loadWishlistFromDB();
+          loadUserBalance();
         } else {
           if (du) du.style.display = 'none';
           localWishlist = [];
@@ -1977,6 +2000,109 @@
       aiTyping = false; document.getElementById('ai-send-btn').disabled = false; document.getElementById('ai-input').focus();
     }
 
+
+    // ── GIFT CARD & BALANCE ───────────────────────────────────────
+    var userBalance = 0;
+
+    async function loadUserBalance() {
+      if (!fbDB || !currentUser) return;
+      var doc = await fbDB.collection('users').doc(currentUser.uid).get();
+      userBalance = doc.exists ? (parseFloat(doc.data().balance) || 0) : 0;
+      var el = document.getElementById('profile-balance');
+      if (el) el.textContent = '$' + userBalance.toFixed(2);
+      updateCheckoutBalance();
+    }
+
+    function updateCheckoutBalance() {
+      var btn = document.getElementById('balance-pay-btn');
+      var info = document.getElementById('checkout-balance-info');
+      if (!btn || !info) return;
+      var total = getDiscountedTotal ? getDiscountedTotal() : getTotal();
+      if (currentUser && userBalance > 0) {
+        info.textContent = 'Your balance: $' + userBalance.toFixed(2);
+        btn.style.display = 'block';
+        btn.disabled = userBalance < total;
+        btn.textContent = userBalance >= total
+          ? '💰 Pay $' + total.toFixed(2) + ' with Balance'
+          : '💰 Balance insufficient ($' + userBalance.toFixed(2) + ')';
+      } else {
+        info.textContent = currentUser ? 'Your balance: $0.00' : 'Login to use balance';
+        btn.style.display = currentUser ? 'block' : 'none';
+        if (btn.style.display === 'block') btn.disabled = true;
+      }
+    }
+
+    async function redeemGiftCard() {
+      if (!currentUser) { openAccount(); return; }
+      if (!fbDB) return;
+      var input = document.getElementById('gc-redeem-input');
+      var msg = document.getElementById('gc-redeem-msg');
+      var code = input.value.trim().toUpperCase();
+      if (!code) { msg.textContent = 'Please enter a code.'; msg.className = 'gc-redeem-msg err'; return; }
+      msg.textContent = 'Checking...'; msg.className = 'gc-redeem-msg';
+      try {
+        var gcDoc = await fbDB.collection('giftcards').doc(code).get();
+        if (!gcDoc.exists) { msg.textContent = '✕ Invalid code.'; msg.className = 'gc-redeem-msg err'; return; }
+        var gc = gcDoc.data();
+        if (gc.used) { msg.textContent = '✕ This code has already been used.'; msg.className = 'gc-redeem-msg err'; return; }
+        // Mark as used
+        await fbDB.collection('giftcards').doc(code).update({ used: true, usedBy: currentUser.uid, usedAt: new Date().toISOString() });
+        // Add balance to user
+        var newBalance = userBalance + parseFloat(gc.value);
+        await fbDB.collection('users').doc(currentUser.uid).update({ balance: newBalance });
+        userBalance = newBalance;
+        var el = document.getElementById('profile-balance');
+        if (el) el.textContent = '$' + userBalance.toFixed(2);
+        input.value = '';
+        msg.textContent = '✓ $' + parseFloat(gc.value).toFixed(2) + ' added to your balance!';
+        msg.className = 'gc-redeem-msg ok';
+        updateCheckoutBalance();
+      } catch(e) {
+        msg.textContent = '✕ Error: ' + e.message;
+        msg.className = 'gc-redeem-msg err';
+      }
+    }
+
+    async function payWithBalance() {
+      if (!currentUser || !fbDB) { openAccount(); return; }
+      var total = getDiscountedTotal ? getDiscountedTotal() : getTotal();
+      if (userBalance < total) { alert('Insufficient balance!'); return; }
+      var btn = document.getElementById('balance-pay-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Processing...';
+      try {
+        var newBalance = userBalance - total;
+        await fbDB.collection('users').doc(currentUser.uid).update({ balance: newBalance });
+        // Save order
+        var userDoc = await fbDB.collection('users').doc(currentUser.uid).get();
+        var existing = userDoc.exists ? (userDoc.data().orders || []) : [];
+        existing.push({ name: cart.map(function(i) { return i.name; }).join(', '), price: total.toFixed(2), crypto: 'Balance', time: new Date().toISOString() });
+        await fbDB.collection('users').doc(currentUser.uid).update({ orders: existing, balance: newBalance });
+        userBalance = newBalance;
+        closeCheckout();
+        // Show success
+        var el = document.getElementById('profile-balance');
+        if (el) el.textContent = '$' + newBalance.toFixed(2);
+        cart = [];
+        renderCart();
+        alert('✅ Payment successful! $' + total.toFixed(2) + ' deducted. DM on Discord to receive your item!');
+      } catch(e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '💰 Pay with Balance';
+      }
+    }
+
+    // Hook into openCheckout to update balance display
+    var _origOpenCheckout = openCheckout;
+    openCheckout = function() {
+      _origOpenCheckout();
+      updateCheckoutBalance();
+    };
+
+    // Hook into Firebase auth to load balance
+    var _origFBAuthChanged = null;
+
     // ── ANALYTICS & ADMIN ─────────────────────────────────────────
     var pv = parseInt(localStorage.getItem('sa_pageviews') || '0') + 1;
     localStorage.setItem('sa_pageviews', pv);
@@ -2152,6 +2278,17 @@
       <div class="profile-section">
         <div class="profile-section-title"><i class="ti ti-heart"></i> Wishlist</div>
         <div id="profile-wishlist"><div class="profile-empty">Tap ♡ on any item to save it!</div></div>
+      </div>
+      <div class="profile-section">
+        <div class="profile-section-title"><i class="ti ti-wallet"></i> Balance</div>
+        <div style="text-align:center">
+          <div class="balance-badge">💰 <span id="profile-balance">$0.00</span></div>
+        </div>
+        <div class="gc-redeem-wrap">
+          <input class="gc-redeem-input" id="gc-redeem-input" type="text" placeholder="Enter gift card code..."/>
+          <button class="gc-redeem-btn" onclick="redeemGiftCard()">Redeem</button>
+        </div>
+        <div class="gc-redeem-msg" id="gc-redeem-msg"></div>
       </div>
       <button class="profile-signout" onclick="doSignOut()">Sign Out</button>
     </div>
