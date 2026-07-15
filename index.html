@@ -838,6 +838,23 @@
     .balance-pay-btn:disabled{opacity:.35;cursor:not-allowed}
     .balance-info{font-size:12px;color:rgba(252,165,165,0.4);text-align:center;margin-top:8px}
 
+
+    /* ── PRIVACY ── */
+    .account-checkbox-wrap{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:rgba(252,165,165,0.5);line-height:1.5}
+    .account-checkbox-wrap input[type=checkbox]{margin-top:2px;accent-color:#dc2626;width:14px;height:14px;flex-shrink:0;cursor:pointer}
+    .account-checkbox-wrap a{color:#f87171;text-decoration:underline;cursor:pointer}
+    .privacy-overlay{position:fixed;inset:0;z-index:1200;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.7)}
+    .privacy-overlay.open{display:flex}
+    .privacy-box{background:#100707;border:1px solid rgba(196,28,28,0.3);border-top:1px solid rgba(196,28,28,0.5);border-radius:20px 20px 0 0;width:100%;max-width:460px;max-height:85vh;overflow-y:auto;padding:24px 20px 32px;animation:slideUp .22s ease}
+    .privacy-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#fee2e2;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+    .privacy-close{background:none;border:none;color:rgba(252,165,165,0.4);font-size:22px;cursor:pointer}
+    .privacy-text{font-size:12px;color:rgba(252,165,165,0.5);line-height:1.8}
+    .privacy-text h3{font-family:'Syne',sans-serif;font-size:13px;color:#fee2e2;margin:14px 0 6px}
+    .privacy-text p{margin-bottom:8px}
+    /* delete account */
+    .delete-account-btn{width:100%;padding:12px;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:12px;color:rgba(248,113,113,0.6);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;transition:all .2s}
+    .delete-account-btn:hover{background:rgba(248,113,113,0.12);color:#f87171;border-color:rgba(248,113,113,0.4)}
+
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -2001,6 +2018,50 @@
     }
 
 
+
+    // ── PRIVACY POLICY ───────────────────────────────────────────
+    function openPrivacy() { document.getElementById('privacy-overlay').classList.add('open'); }
+    function closePrivacy() { document.getElementById('privacy-overlay').classList.remove('open'); }
+
+    // Show/hide register-only section based on tab
+    var _origSwitchTab = switchTab;
+    switchTab = function(mode) {
+      _origSwitchTab(mode);
+      var ro = document.getElementById('register-only');
+      if (ro) ro.style.display = mode === 'register' ? 'block' : 'none';
+    };
+
+    // Check checkbox on register
+    var _origDoAuth = doAuth;
+    doAuth = async function() {
+      if (authMode === 'register') {
+        var cb = document.getElementById('privacy-checkbox');
+        if (!cb || !cb.checked) {
+          document.getElementById('auth-err').textContent = 'Please accept the Privacy Policy to register.';
+          return;
+        }
+      }
+      await _origDoAuth();
+    };
+
+    // Delete account
+    async function deleteAccount() {
+      if (!currentUser || !fbDB) return;
+      if (!confirm('Are you sure? This will permanently delete your account and all your data (balance, orders, wishlist). This cannot be undone!')) return;
+      try {
+        await fbDB.collection('users').doc(currentUser.uid).delete();
+        await currentUser.delete();
+        closeProfile();
+        alert('Your account and all data has been deleted.');
+      } catch(e) {
+        if (e.code === 'auth/requires-recent-login') {
+          alert('For security, please sign out and sign back in before deleting your account.');
+        } else {
+          alert('Error: ' + e.message);
+        }
+      }
+    }
+
     // ── GIFT CARD & BALANCE ───────────────────────────────────────
     var userBalance = 0;
 
@@ -2255,6 +2316,12 @@
       <input class="account-input" id="auth-email" type="email" placeholder="Email address"/>
       <input class="account-input" id="auth-password" type="password" placeholder="Password (min. 6 chars)"/>
       <div class="account-err" id="auth-err"></div>
+      <div id="register-only" style="display:none">
+        <div class="account-checkbox-wrap">
+          <input type="checkbox" id="privacy-checkbox"/>
+          <span>I agree to the <a onclick="openPrivacy()">Privacy Policy</a> and consent to my data being stored for account purposes.</span>
+        </div>
+      </div>
       <button class="account-btn" id="auth-btn" onclick="doAuth()">Login</button>
     </div>
   </div>
@@ -2291,6 +2358,35 @@
         <div class="gc-redeem-msg" id="gc-redeem-msg"></div>
       </div>
       <button class="profile-signout" onclick="doSignOut()">Sign Out</button>
+      <button class="delete-account-btn" onclick="deleteAccount()">🗑️ Delete Account & Data</button>
+    </div>
+  </div>
+
+
+  <!-- PRIVACY POLICY -->
+  <div class="privacy-overlay" id="privacy-overlay" onclick="if(event.target===this)closePrivacy()">
+    <div class="privacy-box">
+      <div class="privacy-title">
+        Privacy Policy
+        <button class="privacy-close" onclick="closePrivacy()">✕</button>
+      </div>
+      <div class="privacy-text">
+        <p>Last updated: 2026</p>
+        <h3>1. Who we are</h3>
+        <p>Maxi Shop is a private Roblox item trading shop. Contact: discord.gg/PG7q7tXbak</p>
+        <h3>2. What data we collect</h3>
+        <p>When you create an account we collect your email address. We also store your order history, wishlist and account balance.</p>
+        <h3>3. Why we collect it</h3>
+        <p>Your email is used to identify your account and to send you optional newsletters about new items and sales. Order history and balance are needed to provide our service.</p>
+        <h3>4. How we store it</h3>
+        <p>Your data is stored securely using Google Firebase (Firestore). We do not sell your data to third parties.</p>
+        <h3>5. Your rights</h3>
+        <p>You can delete your account and all associated data at any time from your profile page. You can also contact us on Discord to request data deletion.</p>
+        <h3>6. Newsletter</h3>
+        <p>By creating an account you may receive occasional newsletters. You can opt out at any time by deleting your account or contacting us on Discord.</p>
+        <h3>7. Cookies</h3>
+        <p>We use browser localStorage and sessionStorage only for essential functionality (login session, analytics). No tracking cookies.</p>
+      </div>
     </div>
   </div>
 
