@@ -492,10 +492,10 @@
     .section-title-big{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:rgba(252,165,165,0.6);letter-spacing:1px;white-space:nowrap}
 
     /* ── DRAWER ── */
-    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;display:none}
-    .drawer-overlay.open{display:block}
-    .drawer{position:fixed;top:0;left:-280px;width:260px;height:100%;background:#0d0606;border-right:1px solid rgba(196,28,28,0.2);z-index:700;transition:left .25s ease;padding:20px 0;display:flex;flex-direction:column}
-    .drawer.open{left:0}
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:600;display:none;transition:background .35s ease}
+    .drawer-overlay.open{display:block;background:rgba(0,0,0,0.55)}
+    .drawer{position:fixed;top:0;right:-280px;width:260px;height:100%;background:rgba(13,6,6,0.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-left:1px solid rgba(196,28,28,0.25);z-index:700;transition:right .35s cubic-bezier(0.32,0.72,0,1);padding:20px 0;display:flex;flex-direction:column}
+    .drawer.open{right:0}
     .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px 20px;border-bottom:1px solid rgba(196,28,28,0.15);margin-bottom:10px}
     .drawer-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fee2e2}
     .drawer-close{background:none;border:none;color:rgba(252,165,165,0.4);font-size:22px;cursor:pointer}
@@ -564,8 +564,8 @@
     .ham-float span{display:block;width:26px;height:2.5px;background:#fee2e2;border-radius:2px;transition:all .25s;box-shadow:0 1px 4px rgba(0,0,0,0.8)}
 
     /* ── DRAWER ── */
-    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;display:none}
-    .drawer-overlay.open{display:block}
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:600;display:none;transition:background .35s ease}
+    .drawer-overlay.open{display:block;background:rgba(0,0,0,0.55)}
     .drawer{position:fixed;top:0;right:-280px;width:240px;height:100%;background:#0d0606;border-left:1px solid rgba(196,28,28,0.25);z-index:700;transition:right .25s ease;padding:20px 0;display:flex;flex-direction:column}
     .drawer.open{right:0}
     .drawer-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px 20px;border-bottom:1px solid rgba(196,28,28,0.15);margin-bottom:10px}
@@ -854,6 +854,58 @@
     /* delete account */
     .delete-account-btn{width:100%;padding:12px;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:12px;color:rgba(248,113,113,0.6);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;transition:all .2s}
     .delete-account-btn:hover{background:rgba(248,113,113,0.12);color:#f87171;border-color:rgba(248,113,113,0.4)}
+
+
+    .card-img-wrap.logo-img{aspect-ratio:1/1;background:#111}
+    .card-img-wrap..card-img{object-fit:contain;padding:16px}
+
+
+    .drawer-item{opacity:0;transform:translateX(20px);transition:opacity .25s ease,transform .25s ease,background .2s,color .2s}
+    .drawer.open .drawer-item:nth-child(1){opacity:1;transform:translateX(0);transition-delay:.08s}
+    .drawer.open .drawer-item:nth-child(2){opacity:1;transform:translateX(0);transition-delay:.12s}
+    .drawer.open .drawer-item:nth-child(3){opacity:1;transform:translateX(0);transition-delay:.16s}
+    .drawer.open .drawer-item:nth-child(4){opacity:1;transform:translateX(0);transition-delay:.20s}
+    .drawer.open .drawer-item:nth-child(5){opacity:1;transform:translateX(0);transition-delay:.24s}
+    .drawer.open .drawer-item:nth-child(6){opacity:1;transform:translateX(0);transition-delay:.28s}
+    .drawer.open .drawer-item:nth-child(7){opacity:1;transform:translateX(0);transition-delay:.32s}
+
+    .modal-overlay{transition:opacity .25s ease}
+    .modal-overlay:not(.open){opacity:0;pointer-events:none}
+    .modal-overlay.open{opacity:1}
+    .ai-overlay{transition:transform .35s cubic-bezier(0.32,0.72,0,1),opacity .25s ease}
+    .ai-overlay:not(.open){transform:translateY(100%);opacity:0}
+    .ai-overlay.open{transform:translateY(0);opacity:1}
+    .profile-overlay{transition:transform .35s cubic-bezier(0.32,0.72,0,1),opacity .25s ease}
+    .profile-overlay:not(.open){transform:translateY(100%);opacity:0}
+    .profile-overlay.open{transform:translateY(0);opacity:1}
+    .features-overlay{transition:transform .35s cubic-bezier(0.32,0.72,0,1),opacity .25s ease}
+    .features-overlay:not(.open){transform:translateY(100%);opacity:0}
+    .features-overlay.open{display:block!important;transform:translateY(0);opacity:1}
+    .filtermenu-overlay{transition:transform .35s cubic-bezier(0.32,0.72,0,1),opacity .25s ease}
+    .filtermenu-overlay:not(.open){transform:translateY(100%);opacity:0}
+    .filtermenu-overlay.open{display:flex!important;transform:translateY(0);opacity:1}
+    .account-overlay{transition:opacity .25s ease}
+    .account-overlay:not(.open){opacity:0;pointer-events:none}
+    .account-overlay.open{opacity:1}
+    .account-box{transition:transform .3s cubic-bezier(0.32,0.72,0,1)}
+    .account-overlay:not(.open) .account-box{transform:scale(0.92) translateY(10px)}
+    .account-overlay.open .account-box{transform:scale(1) translateY(0)}
+    .privacy-overlay{transition:opacity .25s ease}
+    .privacy-overlay:not(.open){opacity:0;pointer-events:none}
+    .privacy-overlay.open{opacity:1}
+    .item-modal-overlay{transition:opacity .25s ease}
+    .item-modal-overlay:not(.open){opacity:0;pointer-events:none}
+    .item-modal-overlay.open{display:flex!important;opacity:1}
+
+    .ham-float{transition:transform .2s ease}
+    .ham-float:hover{transform:scale(1.1)}
+    .ham-float:active{transform:scale(0.92)}
+    .ham-float span{transition:all .3s cubic-bezier(0.32,0.72,0,1)}
+
+    .card{transition:transform .2s ease,box-shadow .2s ease}
+    .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(196,28,28,0.15)}
+    .atc-btn,.buy-btn2,.checkout-btn,.pay-main-btn,.account-btn{transition:all .2s ease}
+    .atc-btn:active,.buy-btn2:active{transform:scale(0.96)}
 
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -1221,7 +1273,7 @@
           <button class="buy-btn2" onclick="buyNow(this)">Buy Now</button>
         </div>
       </div>
-    </div>
+    
     
     
 
@@ -1278,6 +1330,8 @@
           <button class="buy-btn2" onclick="buyNow(this)">Buy Now</button>
         </div>
       </div>
+  </div>
+
 
   <div class="stats-grid">
     <div class="stat-box">
